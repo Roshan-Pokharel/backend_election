@@ -8,6 +8,9 @@ const authRoutes = require('./routes/authRoutes'); // Assuming you create this s
 dotenv.config();
 const app = express();
 
+// Tell Express to trust the proxy (Render, Heroku, etc.)
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors());
 app.use(express.json());

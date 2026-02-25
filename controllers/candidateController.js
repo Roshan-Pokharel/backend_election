@@ -35,9 +35,11 @@ const getCandidateById = async (req, res) => {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    // Get the user's IP Address
-    // Note: If you deploy to Heroku/Vercel/Render, use req.headers['x-forwarded-for']
-    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    // Get the user's IP Address and handle Render proxies
+    let userIp = req.ip || req.socket.remoteAddress;
+    if (typeof userIp === 'string' && userIp.includes(',')) {
+      userIp = userIp.split(',')[0].trim();
+    }
 
     // If this IP hasn't viewed the profile yet, add it to the array
     if (!candidate.viewedBy.includes(userIp)) {
@@ -57,7 +59,7 @@ const getCandidateById = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
-}; // Fixed syntax error here
+};
 
 // @desc    Toggle Like/Dislike
 // @route   POST /api/candidates/:id/interact
@@ -65,7 +67,12 @@ const getCandidateById = async (req, res) => {
 const interactCandidate = async (req, res) => {
   try {
     const { action } = req.body; // Expects 'like' or 'dislike'
-    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    
+    // Get the user's IP Address and handle Render proxies
+    let userIp = req.ip || req.socket.remoteAddress;
+    if (typeof userIp === 'string' && userIp.includes(',')) {
+      userIp = userIp.split(',')[0].trim();
+    }
     
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
