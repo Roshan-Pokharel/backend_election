@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
 const { protect } = require('../middleware/auth');
 const {
   getCandidates,
   getCandidateById,
-  interactCandidate, // <-- Added the new interact function here
+  interactCandidate, 
   createCandidate,
   updateCandidate,
   deleteCandidate
@@ -14,12 +13,12 @@ const {
 // Public Routes
 router.get('/', getCandidates);
 router.get('/:id', getCandidateById);
-router.post('/:id/interact', interactCandidate); // <-- Linked the route to the controller
+router.post('/:id/interact', interactCandidate);
 
 // Protected Routes (Require Authentication)
-// Add upload.single('image') to both POST and PUT to handle file uploads
-router.post('/', protect, upload.single('image'), createCandidate);
-router.put('/:id', protect, upload.single('image'), updateCandidate);
+// Removed multer upload middleware completely
+router.post('/', protect, createCandidate);
+router.put('/:id', protect, updateCandidate);
 router.delete('/:id', protect, deleteCandidate);
 
 module.exports = router;

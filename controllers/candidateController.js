@@ -7,7 +7,6 @@ const getCandidates = async (req, res) => {
   try {
     const candidates = await Candidate.aggregate([
       {
-        // Add temporary fields to hold the array lengths
         $addFields: {
           likesCount: { $size: { $ifNull: ['$likedBy', []] } },
           dislikesCount: { $size: { $ifNull: ['$dislikedBy', []] } },
@@ -15,8 +14,6 @@ const getCandidates = async (req, res) => {
         }
       },
       {
-        // Sort by likesCount descending (largest to smallest)
-        // Secondary sort by createdAt descending (newest first for ties)
         $sort: { likesCount: -1, createdAt: -1 }
       }
     ]);
@@ -35,19 +32,13 @@ const getCandidateById = async (req, res) => {
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
-    // Get the user's IP Address and handle Render proxies
-    let userIp = req.ip || req.socket.remoteAddress;
-    if (typeof userIp === 'string' && userIp.includes(',')) {
-      userIp = userIp.split(',')[0].trim();
-    }
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    // If this IP hasn't viewed the profile yet, add it to the array
     if (!candidate.viewedBy.includes(userIp)) {
       candidate.viewedBy.push(userIp);
       await candidate.save();
     }
 
-    // Send the candidate data, plus calculated counts and user status
     res.json({
       ...candidate.toObject(),
       viewsCount: candidate.viewedBy.length,
@@ -66,32 +57,23 @@ const getCandidateById = async (req, res) => {
 // @access  Public
 const interactCandidate = async (req, res) => {
   try {
-    const { action } = req.body; // Expects 'like' or 'dislike'
-    
-    // Get the user's IP Address and handle Render proxies
-    let userIp = req.ip || req.socket.remoteAddress;
-    if (typeof userIp === 'string' && userIp.includes(',')) {
-      userIp = userIp.split(',')[0].trim();
-    }
+    const { action } = req.body; 
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     
     const candidate = await Candidate.findById(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
 
     if (action === 'like') {
-      // If already liked, remove the like (toggle off)
       if (candidate.likedBy.includes(userIp)) {
         candidate.likedBy = candidate.likedBy.filter(ip => ip !== userIp);
       } else {
-        // Add like, and remove from dislikes if they had previously disliked
         candidate.likedBy.push(userIp);
         candidate.dislikedBy = candidate.dislikedBy.filter(ip => ip !== userIp);
       }
     } else if (action === 'dislike') {
-      // If already disliked, remove the dislike (toggle off)
       if (candidate.dislikedBy.includes(userIp)) {
         candidate.dislikedBy = candidate.dislikedBy.filter(ip => ip !== userIp);
       } else {
-        // Add dislike, and remove from likes if they had previously liked
         candidate.dislikedBy.push(userIp);
         candidate.likedBy = candidate.likedBy.filter(ip => ip !== userIp);
       }
@@ -115,9 +97,9 @@ const interactCandidate = async (req, res) => {
 // @access  Private (Admin)
 const createCandidate = async (req, res) => {
   try {
+    // We now just grab the image URL directly from req.body
     const newCandidate = new Candidate({
-      ...req.body,
-      imageUrl: req.file ? `/uploads/${req.file.filename}` : null
+      ...req.body
     });
     
     const savedCandidate = await newCandidate.save();
@@ -134,18 +116,12 @@ const updateCandidate = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Copy text fields from the request body
     const updateData = { ...req.body };
-    
-    // If a new image was uploaded, update the imageUrl field
-    if (req.file) {
-      updateData.imageUrl = `/uploads/${req.file.filename}`;
-    }
 
     const updatedCandidate = await Candidate.findByIdAndUpdate(
       id, 
       updateData, 
-      { new: true, runValidators: true } // Return the updated document & run schema validations
+      { new: true, runValidators: true }
     );
 
     if (!updatedCandidate) {
